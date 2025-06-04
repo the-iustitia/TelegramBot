@@ -1,6 +1,7 @@
 import asyncio
 import json
 import random
+import os
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ParseMode
@@ -13,32 +14,30 @@ BOT_TOKEN = ""
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# Загрузка вопросов из файла
-with open("questions.json", "r", encoding="utf-8") as f:
+QUESTIONS_PATH = os.path.join("json", "questions", "questions.json")
+STATS_PATH = os.path.join("json", "stats.json")
+
+with open(QUESTIONS_PATH, "r", encoding="utf-8") as f:
     questions = json.load(f)
 
 class QuizStates(StatesGroup):
     waiting_for_answer = State()
 
-# Загрузка статистики из файла
 def load_stats():
     try:
-        with open("stats.json", "r", encoding="utf-8") as f:
+        with open(STATS_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
         return {}
 
-# Сохранение статистики
 def save_stats(data):
-    with open("stats.json", "w", encoding="utf-8") as f:
+    with open(STATS_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# Расчёт точности
 def get_accuracy(correct, wrong):
     total = correct + wrong
     return round(correct / total * 100, 1) if total else 0
 
-# Ранг пользователя
 def get_user_rank(user_id, stats):
     sorted_users = sorted(stats.items(), key=lambda x: x[1].get("correct", 0), reverse=True)
     for index, (uid, _) in enumerate(sorted_users):
@@ -46,7 +45,6 @@ def get_user_rank(user_id, stats):
             return index + 1
     return len(sorted_users)
 
-# Генерация таблицы лидеров
 def generate_leaderboard(stats, limit=10):
     sorted_users = sorted(stats.items(), key=lambda item: item[1].get("correct", 0), reverse=True)
     lines = ["🏆 <b>Топ 10 игроков викторины</b>:"]
@@ -60,20 +58,17 @@ def generate_leaderboard(stats, limit=10):
         lines.append(f"{medal} <b>{username}</b> — ✅ {correct} | ❌ {wrong} | 🎯 {acc}%")
     return "\n".join(lines)
 
-# Команда /start
 @dp.message(Command("start"))
 async def start_handler(message: Message, state: FSMContext):
     await message.answer("Привет! Добро пожаловать в викторину 🎓. Готов?")
     await send_question(message.from_user.id, state)
 
-# Команда /leaderboard
 @dp.message(Command("leaderboard"))
 async def leaderboard_handler(message: Message):
     stats = load_stats()
     text = generate_leaderboard(stats)
     await message.answer(text, parse_mode=ParseMode.HTML)
 
-# Команда /profile
 @dp.message(Command("profile"))
 async def profile_handler(message: Message):
     user_id = str(message.from_user.id)
@@ -102,7 +97,6 @@ async def profile_handler(message: Message):
         parse_mode=ParseMode.HTML
     )
 
-# Отправка вопроса
 async def send_question(user_id, state: FSMContext):
     q = random.choice(questions)
     question_text = q["question"]
@@ -124,7 +118,6 @@ async def send_question(user_id, state: FSMContext):
 
     await bot.send_message(user_id, f"❓ {question_text}", reply_markup=keyboard)
 
-# Обработка ответа
 @dp.callback_query(QuizStates.waiting_for_answer)
 async def answer_handler(callback: CallbackQuery, state: FSMContext):
     user_id = str(callback.from_user.id)
@@ -158,7 +151,6 @@ async def answer_handler(callback: CallbackQuery, state: FSMContext):
     save_stats(stats)
     await send_question(callback.from_user.id, state)
 
-# Основной запуск
 async def main():
     print("Quiz started!!!")
     await dp.start_polling(bot)
