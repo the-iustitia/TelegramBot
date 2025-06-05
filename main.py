@@ -1,3 +1,7 @@
+from generate_profile import generate_profile
+from aiogram.types import InputFile
+import time
+import traceback
 import asyncio
 import json
 import random
@@ -10,7 +14,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import Command
 
-BOT_TOKEN = ""
+BOT_TOKEN = "7335965093:AAGg4AFZNtvBvxjQxD6qGwTyOtZ1HfpOYHQ"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -70,32 +74,21 @@ async def leaderboard_handler(message: Message):
     await message.answer(text, parse_mode=ParseMode.HTML)
 
 @dp.message(Command("profile"))
-async def profile_handler(message: Message):
-    user_id = str(message.from_user.id)
-    stats = load_stats()
-    user = stats.get(user_id)
+async def send_profile(message: Message):
+    from aiogram.types.input_file import FSInputFile
 
-    if not user:
-        await message.answer("У тебя пока нет статистики. Начни игру с /start.")
-        return
+    user = message.from_user
+    user_id = str(user.id)
+    user_name = user.full_name
 
-    correct = user.get("correct", 0)
-    wrong = user.get("wrong", 0)
-    acc = get_accuracy(correct, wrong)
-    rank = get_user_rank(user_id, stats)
-    total = correct + wrong
-    xp = user.get("xp", 0)
+    profile_path = generate_profile(user_id)
 
-    await message.answer(
-        f"<b>👤 Профиль: {user.get('username', 'Без имени')}</b>\n"
-        f"✅ Правильных: <b>{correct}</b>\n"
-        f"❌ Неправильных: <b>{wrong}</b>\n"
-        f"🎯 Точность: <b>{acc}%</b>\n"
-        f"🏅 Ранг: <b>{rank}</b> из {len(stats)}\n"
-        f"📚 Всего ответов: <b>{total}</b>\n"
-        f"⭐ Опыт: <b>{xp}</b>",
-        parse_mode=ParseMode.HTML
-    )
+    if profile_path and os.path.exists(profile_path):
+        photo = FSInputFile(profile_path)
+        await message.reply_photo(photo)
+    else:
+        await message.reply("❌ Не удалось создать профиль.")
+
 
 async def send_question(user_id, state: FSMContext):
     q = random.choice(questions)
@@ -152,8 +145,9 @@ async def answer_handler(callback: CallbackQuery, state: FSMContext):
     await send_question(callback.from_user.id, state)
 
 async def main():
-    print("Quiz started!!!")
     await dp.start_polling(bot)
+
+
 
 if __name__ == "__main__":
     asyncio.run(main())
