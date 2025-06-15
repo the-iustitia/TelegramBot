@@ -68,7 +68,7 @@ async def start_handler(message: Message, state: FSMContext):
     stats = load_stats()
     stats.setdefault(user_id, {
         "correct": 0, "wrong": 0, "username": message.from_user.username or f"ID:{user_id}",
-        "xp": 0, "recent_correct_ids": []
+        "xp": 0, "recent_correct_ids": [], "avatar": avatat_choice
     })
     save_stats(stats)
     await state.clear()
@@ -219,13 +219,12 @@ async def answer_handler(callback: CallbackQuery, state: FSMContext):
     save_stats(stats)
     await send_question(callback.from_user.id, state)
 
+
 async def send_profile(message: Message):
     from aiogram.types.input_file import FSInputFile
 
-    user = message.from_user
-    user_id = str(user.id)
-
-    profile_path = generate_profile(user_id)
+    user_id = message.from_user.id
+    profile_path = await generate_profile(bot, user_id)
 
     if profile_path and os.path.exists(profile_path):
         photo = FSInputFile(profile_path)
